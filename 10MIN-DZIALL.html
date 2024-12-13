@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cool Audio Recorder</title>
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #1a1a2e;
+            color: #fff;
+            height: 100%;
+            overflow: hidden;
+        }
+        .container {
+            position: relative;
+            z-index: 1;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 20px;
+            padding: 2rem;
+            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+            backdrop-filter: blur(4px);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            max-width: 600px;
+            margin: 50px auto;
+        }
+        h1 {
+            text-align: center;
+            margin-bottom: 2rem;
+            font-size: 2.5em;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+        }
+        button {
+            background-color: #0f3460;
+            border: none;
+            color: white;
+            padding: 15px 32px;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 16px;
+            margin: 4px 2px;
+            cursor: pointer;
+            border-radius: 50px;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        button:hover {
+            background-color: #16213e;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 8px rgba(0, 0, 0, 0.15);
+        }
+        #library {
+            margin-top: 2rem;
+        }
+        #library h2 {
+            margin-bottom: 1rem;
+            font-size: 1.8em;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
+        }
+        #clips {
+            list-style-type: none;
+            padding: 0;
+        }
+        #clips li {
+            background-color: rgba(255, 255, 255, 0.1);
+            margin-bottom: 1rem;
+            padding: 1rem;
+            border-radius: 10px;
+            transition: all 0.3s ease;
+        }
+        #clips li:hover {
+            background-color: rgba(255, 255, 255, 0.2);
+            transform: translateY(-2px);
+        }
+        .download-btn {
+            background-color: #4CAF50;
+            padding: 8px 16px;
+            font-size: 14px;
+            margin-top: 10px;
+        }
+        .download-btn:hover {
+            background-color: #45a049;
+        }
+        @keyframes move {
+            0% { transform: translate(0, 0); }
+            50% { transform: translate(20px, 20px); }
+            100% { transform: translate(0, 0); }
+        }
+        .background-animation {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+            overflow: hidden;
+        }
+        .background-animation div {
+            position: absolute;
+            display: block;
+            width: 20px;
+            height: 20px;
+            background: rgba(255, 255, 255, 0.05);
+            animation: move 3s infinite;
+        }
+        .background-animation div:nth-child(1) { left: 25%; top: 30%; animation-delay: 0s; }
+        .background-animation div:nth-child(2) { left: 50%; top: 60%; animation-delay: 1s; }
+        .background-animation div:nth-child(3) { left: 75%; top: 10%; animation-delay: 2s; }
+        .background-animation div:nth-child(4) { left: 10%; top: 70%; animation-delay: 1.5s; }
+        .background-animation div:nth-child(5) { left: 85%; top: 40%; animation-delay: 0.5s; }
+    </style>
+</head>
+<body>
+    <div class="background-animation">
+        <div></div>
+        <div></div>
+        <div></div>
+        <div></div>
+        <div></div>
+    </div>
+    <div class="container">
+        <h1>Cool Audio Recorder</h1>
+        <button id="recordButton">Start Recording</button>
+        <button id="stopButton" disabled>Stop Recording</button>
+        <button id="clipButton" disabled>Clip Last 10 Minutes</button>
+        <div id="library">
+            <h2>Saved Clips</h2>
+            <ul id="clips"></ul>
+        </div>
+    </div>
+
+    <script>
+        let mediaRecorder;
+        let audioChunks = [];
+        let recordingStartTime;
+
+        const recordButton = document.getElementById('recordButton');
+        const stopButton = document.getElementById('stopButton');
+        const clipButton = document.getElementById('clipButton');
+        const clips = document.getElementById('clips');
+
+        recordButton.onclick = startRecording;
+        stopButton.onclick = stopRecording;
+        clipButton.onclick = clipLastTenMinutes;
+
+        async function startRecording() {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            mediaRecorder = new MediaRecorder(stream);
+
+            mediaRecorder.ondataavailable = (event) => {
+                audioChunks.push(event.data);
+            };
+
+            mediaRecorder.onstop = () => {
+                const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                const audioUrl = URL.createObjectURL(audioBlob);
+                const audio = new Audio(audioUrl);
+                audio.addEventListener('loadedmetadata', () => {
+                    const duration = audio.duration;
+                    console.log(`Recording duration: ${duration} seconds`);
+                });
+            };
+
+            audioChunks = [];
+            mediaRecorder.start();
+            recordingStartTime = Date.now();
+
+            recordButton.disabled = true;
+            stopButton.disabled = false;
+            clipButton.disabled = false;
+        }
+
+        function stopRecording() {
+            if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+                mediaRecorder.stop();
+                recordButton.disabled = false;
+                stopButton.disabled = true;
+            }
+        }
+
+        function clipLastTenMinutes() {
+            if (mediaRecorder && mediaRecorder.state === 'recording') {
+                const currentTime = Date.now();
+                const recordingDuration = currentTime - recordingStartTime;
+                
+                if (recordingDuration < 1000) {
+                    alert("Recording duration is too short. Please record for at least 1 second.");
+                    return;
+                }
+
+                mediaRecorder.stop();
+
+                mediaRecorder.onstop = () => {
+                    const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                    const audioUrl = URL.createObjectURL(audioBlob);
+                    
+                    const audio = new Audio(audioUrl);
+                    audio.addEventListener('loadedmetadata', () => {
+                        const fullDuration = audio.duration;
+                        const clipStart = Math.max(0, fullDuration - 600); // 10 minutes = 600 seconds
+                        
+                        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                        
+                        fetch(audioUrl)
+                            .then(response => response.arrayBuffer())
+                            .then(arrayBuffer => audioContext.decodeAudioData(arrayBuffer))
+                            .then(audioBuffer => {
+                                const clipDuration = Math.min(600, fullDuration);
+                                const clippedBuffer = audioContext.createBuffer(
+                                    audioBuffer.numberOfChannels,
+                                    audioContext.sampleRate * clipDuration,
+                                    audioContext.sampleRate
+                                );
+
+                                for (let channel = 0; channel < audioBuffer.numberOfChannels; channel++) {
+                                    const channelData = audioBuffer.getChannelData(channel);
+                                    const clippedChannelData = clippedBuffer.getChannelData(channel);
+                                    const startOffset = Math.floor(clipStart * audioContext.sampleRate);
+                                    clippedChannelData.set(channelData.subarray(startOffset, startOffset + clippedBuffer.length));
+                                }
+
+                                const clippedBlob = audioBufferToWav(clippedBuffer);
+                                const clippedUrl = URL.createObjectURL(clippedBlob);
+
+                                const clipElement = document.createElement('li');
+                                const clipAudio = document.createElement('audio');
+                                clipAudio.src = clippedUrl;
+                                clipAudio.controls = true;
+
+                                const timestamp = new Date().toLocaleTimeString();
+                                const clipLabel = document.createElement('p');
+                                clipLabel.textContent = `Clip from ${timestamp} (${clipDuration.toFixed(2)} seconds)`;
+
+                                const downloadBtn = document.createElement('button');
+                                downloadBtn.textContent = 'Download';
+                                downloadBtn.className = 'download-btn';
+                                downloadBtn.onclick = () => {
+                                    const a = document.createElement('a');
+                                    a.href = clippedUrl;
+                                    a.download = `audio_clip_${timestamp.replace(/:/g, '-')}.wav`;
+                                    a.click();
+                                };
+
+                                clipElement.appendChild(clipLabel);
+                                clipElement.appendChild(clipAudio);
+                                clipElement.appendChild(downloadBtn);
+                                clips.prepend(clipElement);
+
+                                // Keep only the last 3 recordings
+                                while (clips.children.length > 3) {
+                                    clips.removeChild(clips.lastChild);
+                                }
+                            });
+                    });
+
+                    // Restart recording
+                    audioChunks = [];
+                    mediaRecorder.start();
+                    recordingStartTime = Date.now();
+                };
+            }
+        }
+
+        // Function to convert AudioBuffer to WAV Blob
+        function audioBufferToWav(buffer, opt) {
+            opt = opt || {};
+            const numChannels = buffer.numberOfChannels;
+            const sampleRate = buffer.sampleRate;
+            const format = opt.float32 ? 3 : 1;
+            const bitDepth = format === 3 ? 32 : 16;
+
+            let result;
+            if (numChannels === 2) {
+                result = interleave(buffer.getChannelData(0), buffer.getChannelData(1));
+            } else {
+                result = buffer.getChannelData(0);
+            }
+
+            return encodeWAV(result, format, sampleRate, numChannels, bitDepth);
+        }
+
+        function encodeWAV(samples, format, sampleRate, numChannels, bitDepth) {
+            const bytesPerSample = bitDepth / 8;
+            const blockAlign = numChannels * bytesPerSample;
+
+            const buffer = new ArrayBuffer(44 + samples.length * bytesPerSample);
+            const view = new DataView(buffer);
+
+            /* RIFF identifier */
+            writeString(view, 0, 'RIFF');
+            /* RIFF chunk length */
+            view.setUint32(4, 36 + samples.length * bytesPerSample, true);
+            /* RIFF type */
+            writeString(view, 8, 'WAVE');
+            /* format chunk identifier */
+            writeString(view, 12, 'fmt ');
+            /* format chunk length */
+            view.setUint32(16, 16, true);
+            /* sample format (raw) */
+            view.setUint16(20, format, true);
+            /* channel count */
+            view.setUint16(22, numChannels, true);
+            /* sample rate */
+            view.setUint32(24, sampleRate, true);
+            /* byte rate (sample rate * block align) */
+            view.setUint32(28, sampleRate * blockAlign, true);
+            /* block align (channel count * bytes per sample) */
+            view.setUint16(32, blockAlign, true);
+            /* bits per sample */
+            view.setUint16(34, bitDepth, true);
+            /* data chunk identifier */
+            writeString(view, 36, 'data');
+            /* data chunk length */
+            view.setUint32(40, samples.length * bytesPerSample, true);
+            if (format === 1) { // Raw PCM
+                floatTo16BitPCM(view, 44, samples);
+            } else {
+                writeFloat32(view, 44, samples);
+            }
+
+            return new Blob([buffer], { type: 'audio/wav' });
+        }
+
+        function interleave(inputL, inputR) {
+            const length = inputL.length + inputR.length;
+            const result = new Float32Array(length);
+
+            let index = 0;
+            let inputIndex = 0;
+
+            while (index < length) {
+                result[index++] = inputL[inputIndex];
+                result[index++] = inputR[inputIndex];
+                inputIndex++;
+            }
+            return result;
+        }
+
+        function writeFloat32(output, offset, input) {
+            for (let i = 0; i < input.length; i++, offset += 4) {
+                output.setFloat32(offset, input[i], true);
+            }
+        }
+
+        function floatTo16BitPCM(output, offset, input) {
+            for (let i = 0; i < input.length; i++, offset += 2) {
+                const s = Math.max(-1, Math.min(1, input[i]));
+                output.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+            }
+        }
+
+        function writeString(view, offset, string) {
+            for (let i = 0; i < string.length; i++) {
+                view.setUint8(offset + i, string.charCodeAt(i));
+            }
+        }
+    </script>
+</body>
+</html>
